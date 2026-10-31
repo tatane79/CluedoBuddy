@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "wstack",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/winkitee/WStack",
+      "state" : {
+        "branch" : "main",
+        "revision" : "3c39bb276632517a6776abfd0b01bfbca3213c43"
+      }
+    }
+  ],
+  "version" : 2
+}

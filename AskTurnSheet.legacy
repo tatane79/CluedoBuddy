@@ -1,0 +1,385 @@
+//
+//  AskTurnSheet.swift — version archivée avant la refonte guidée
+//  CluedoBuddy
+//
+//  Created by Jonathan Lafarge on 28/11/2023.
+//
+
+import SwiftUI
+import WStack
+
+struct AskTurnSheet: View {
+    
+    let joueurs: [String] = grilleUser.dropFirst().map(\.nom)
+    let nameElement = ["Suspect","Arme","Lieu"]
+    
+    @Binding var isSheetPresented: Bool // Pour fermer la feuille lorsque nécessaire
+    @Binding var joueurActifG: Int
+    
+    @State private var isNoSuspicionSelected = false
+    @State private var isSuspicionSelected = true
+    @State private var isAccusationSelected = false
+    
+    @State private var selectedSuspect: Int?
+    @State private var selectedWeapon: Int?
+    @State private var selectedLocation: Int?
+    @State private var selectedPlayers: Set<Int> = Set()
+    @State private var selectedPlayerIndex: Int = 0 // Indice du joueur sélectionné dans le Picker
+    
+    @State private var selectedElement: [Int] = Array(repeating: -1, count: nb_elements.count)
+    @State private var selectedRefutingPlayers: Set<String> = Set()
+    @State private var selectedRefutingPlayerIndices: [Int] = []
+    @State private var hasACard: [Bool] = Array(repeating: false, count: grilleUser.count)
+    @State private var hasNoCard: [Bool] = Array(repeating: true, count: grilleUser.count)
+    
+    @State private var selectedRefutingElements: [Int] = Array(repeating: -1, count: nb_elements.count)
+    
+    @State private var shownCardSelections: [Int: Int] = [:]
+    
+    //    var userHasCard = false
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                
+                HStack{
+                    Text("Tour de ")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                    Picker(selection: $selectedPlayerIndex, label: Text("Joueur Actif")) {
+                        ForEach(0..<joueurs.count, id: \.self) {
+                            Text(joueurs[$0])
+                            
+                        }
+                        
+                    }
+                    .padding()
+                    .pickerStyle(MenuPickerStyle())
+                }
+                
+                
+                HStack {
+                    Button("Pas de suspicion") {
+                        isNoSuspicionSelected.toggle()
+                        isSuspicionSelected = false
+                        isAccusationSelected = false
+                        // On désélectionne les éléments (au cas où ils avaient été sélectionnés)
+                        selectedElement = Array(repeating: -1, count: nb_elements.count)
+                        
+                        // Réinitialise la liste des joueurs sélectionnés
+                        selectedRefutingPlayers.removeAll()
+                    }
+                    .padding(4)
+                    .foregroundColor(isNoSuspicionSelected ? .white : .blue)
+                    .background(isNoSuspicionSelected ? Color.blue : Color.white)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.blue, lineWidth: 2))
+                    
+                    
+                    Button("Suspicion") {
+                        isNoSuspicionSelected = false
+                        isSuspicionSelected.toggle()
+                        isAccusationSelected = false
+                    }
+                    .padding(4)
+                    .foregroundColor(isSuspicionSelected ? .white : .blue)
+                    .background(isSuspicionSelected ? Color.blue : Color.white)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.blue, lineWidth: 2))
+                    
+                    Button("Accusation indisponible") {
+                    }
+                    .disabled(true)
+                    .padding(4)
+                    .foregroundColor(isAccusationSelected ? .white : .blue)
+                    .background(isAccusationSelected ? Color.red : Color.white)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.blue, lineWidth: 2))
+                }
+                
+                
+                ScrollView {
+                    ForEach(0..<nb_elements.count, id: \.self) { typeElmt in
+                        Section(header: Text("\(nameElement[typeElmt])")) {
+                            let listElmt: [String] = nomCartes[typeElmt].map(\.nom)
+                            WStack(listElmt, spacing: 10, lineSpacing: 10) { elmt in
+                                Button(action: {
+                                    // on récupère le numéro d'objet pour un type d'élément
+                                    selectedElement[typeElmt] = nomCartes[typeElmt].firstIndex { $0.nom == elmt } ?? -1
+                                    updateHasNoCard()
+                                    //                                    userHasCard = (grilleUser[1].cartes[typeElmt][selectedElement[typeElmt]].valeur == "1")
+                                }) {
+                                    Text(elmt)
+                                        .padding(.horizontal)
+                                        .padding(.vertical, 4)
+                                        .background(selectedElement[typeElmt] == nomCartes[typeElmt].firstIndex { $0.nom == elmt } ? Color.blue : Color.white)
+                                        .cornerRadius(10)
+                                        .foregroundColor(selectedElement[typeElmt] == nomCartes[typeElmt].firstIndex { $0.nom == elmt } ? .white : .blue)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color.blue, lineWidth: 2))
+                                }
+                                .disabled(isNoSuspicionSelected)
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+                
+                
+                Section(header: Text("Réfuté par")) {
+                    
+                    // on exclut des répondants le joueur dont c'est le tour :
+                    WStack(joueurs.filter { $0 != grilleUser[selectedPlayerIndex + 1].nom }, spacing: 10, lineSpacing: 10) { j in
+                        Button(action: {
+                            if typeJeu == 0 {
+                                // Un seul joueur peut être sélectionné
+                                selectedRefutingPlayers = Set([j])
+                            } else if typeJeu == 1 {
+                                // Trois joueurs au plus peuvent être sélectionnés
+                                if selectedRefutingPlayers.contains(j) {
+                                    // Désélectionne le joueur s'il est déjà sélectionné
+                                    selectedRefutingPlayers.remove(j)
+                                } else if selectedRefutingPlayers.count < 3 {
+                                    // Sélectionne le joueur si le nombre de joueurs sélectionnés est inférieur à trois
+                                    selectedRefutingPlayers.insert(j)
+                                }
+                            }
+                        }) {
+                            Text(j)
+                                .padding(.horizontal)
+                                .padding(.vertical, 4)
+                                .background(selectedRefutingPlayers.contains(j) ? Color.blue : Color.clear)
+                                .cornerRadius(10)
+                                .foregroundColor(selectedRefutingPlayers.contains(j) ?  .white : nil)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.blue, lineWidth: 2))
+                            
+                            if selectedPlayerIndex == 0,
+                               selectedRefutingPlayers.contains(j),
+                               let playerIndex = grilleUser.firstIndex(where: { $0.nom == j }) {
+                                Picker(
+                                    "Carte montrée",
+                                    selection: shownCardSelection(for: playerIndex)
+                                ) {
+                                    Text("Non précisée").tag(-1)
+                                    ForEach(shownCardChoices) { choice in
+                                        Text(choice.name).tag(choice.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
+                            
+                            // bizarre les deux lignes ci-dessous, vu que déjà au dessus
+                            //                                .background(RoundedRectangle(cornerRadius: 10).stroke(Color.blue, lineWidth: 2))
+                            //                                .foregroundColor(.blue)
+                            
+                        }
+                        //.disabled(isNoSuspicionSelected)
+                        .disabled(isNoSuspicionSelected || ((isSuspicionSelected || isAccusationSelected) && (grilleUser.firstIndex(where: { $0.nom == j }) == 1 && hasNoCard[1])))
+                        .foregroundColor(isNoSuspicionSelected ? .gray : nil) // Ajoutez cette ligne pour définir la couleur du texte en gris lorsque le bouton est désactivé
+                        
+                    }
+                    .padding(.horizontal)
+                }
+
+                if isShownCardMissing {
+                    Label(
+                        "Indiquez la carte qui vous a été montrée.",
+                        systemImage: "eye"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                }
+
+                Button(action: {
+                    // 1) si suspicion, on récupère l'index du suspect, de l'arme et du lieu que l'on place dans un Tour
+                    if isSuspicionSelected {
+                        selectedRefutingPlayerIndices = selectedRefutingPlayers.compactMap { playerName in
+                            grilleUser.firstIndex { $0.nom == playerName }
+                        }
+                        
+                        joueurActifG = selectedPlayerIndex + 1 //ajout de 1 car le Picker menu ne comporte pas le coupable
+                        // Utilisez selectedRefutingPlayerIndices comme tableau d'entiers donnant les numéros de joueur correspondants dans grilleUser
+                        
+                        let tourL = Tour(
+                            joueurDuTour: joueurActifG,
+                            personnageSuspecte: selectedElement[0],
+                            armeSuspectee: selectedElement[1],
+                            lieuSuspecte: selectedElement[2],
+                            joueursRepondant: selectedRefutingPlayerIndices,
+                            shownCards: selectedRefutingPlayerIndices.compactMap {
+                                shownCard(for: $0)
+                            }
+                        )
+                        recordObservedTurn(tourL)
+                    }
+                    // 2) si pas de suspicion, on ne fait rien de plus
+                    // 3) on passe au joueur suivant
+                    let nextJ = (joueurActifG % nb_joueurs) + 1
+                    // on écrase joueurActifG avec le 1er joueur suivant :
+                    joueurActifG = nextJ
+                    saveCurrentGame(activePlayer: joueurActifG)
+
+                    isSheetPresented.toggle() // Ferme la feuille
+                    
+                }) {
+                    Text("Valider")
+                        .padding(.horizontal, 70)
+                        .padding(.vertical, 4)
+                    //.foregroundColor(isSuspicionSelected ? .white : .blue)
+                    //.background(isSuspicionSelected ? Color.blue : Color.white)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.blue, lineWidth: 2))
+                }
+                .disabled(
+                    !(
+                        isNoSuspicionSelected || ((isSuspicionSelected || isAccusationSelected) && (selectedElement[0] >= 0 && selectedElement[1] >= 0 && selectedElement[2] >= 0))
+                    )
+                    || isShownCardMissing
+                )
+                
+            }
+            //.navigationTitle("Tour de \(grilleUser[joueurActifG].nom)")
+            //        .navigationBarItems(trailing: Button("Annuler") {
+            //            isSheetPresented.toggle() // Ferme la feuille lorsque l'utilisateur appuie sur le bouton "Fermer"
+            //
+            //        })
+            .onAppear {
+                // Sélectionnez le joueur actif au démarrage de la vue
+                if grilleUser.indices.contains(joueurActifG),
+                   let index = joueurs.firstIndex(of: grilleUser[joueurActifG].nom) {
+                    selectedPlayerIndex = index
+                } else {
+                    selectedPlayerIndex = 0
+                }
+                // Activer par défaut le bouton "Suspicion"
+                isSuspicionSelected = true
+            }
+            //   .onChange(of: selectedElement) { _ in
+            // Mettez à jour la logique si selectedElement change
+            // Cette partie du code sera exécutée uniquement lorsque selectedElement change
+            //userHasCard = checkElementsInPlayerCards(playerIndex: 1, selectedElements: $selectedElement)
+        }
+        
+        //    private func updateJoueursRepondants() {
+        //        let repondants = joueursRepondant(jActif: joueurActifG, suspicion: (selectedElement[0],selectedElement[1],selectedElement[2]))
+        //    }
+    }
+    
+    private var isShownCardMissing: Bool {
+        guard selectedPlayerIndex == 0 else { return false }
+
+        return selectedRefutingPlayers.contains { playerName in
+            guard let playerIndex = grilleUser.firstIndex(where: { $0.nom == playerName }) else {
+                return true
+            }
+            return shownCardSelections[playerIndex, default: -1] < 0
+        }
+    }
+
+    private var shownCardChoices: [ShownCardChoice] {
+        selectedElement.enumerated().compactMap { typeIndex, cardIndex in
+            guard cardIndex >= 0,
+                  nomCartes.indices.contains(typeIndex),
+                  nomCartes[typeIndex].indices.contains(cardIndex)
+            else {
+                return nil
+            }
+
+            return ShownCardChoice(
+                id: typeIndex * 1_000 + cardIndex,
+                name: nomCartes[typeIndex][cardIndex].nom
+            )
+        }
+    }
+
+    private func shownCardSelection(for playerIndex: Int) -> Binding<Int> {
+        Binding(
+            get: { shownCardSelections[playerIndex] ?? -1 },
+            set: { shownCardSelections[playerIndex] = $0 }
+        )
+    }
+
+    private func shownCard(for playerIndex: Int) -> ShownCard? {
+        guard let encodedChoice = shownCardSelections[playerIndex],
+              encodedChoice >= 0
+        else {
+            return nil
+        }
+
+        return ShownCard(
+            playerIndex: playerIndex,
+            typeIndex: encodedChoice / 1_000,
+            cardIndex: encodedChoice % 1_000
+        )
+    }
+
+    private func updateHasACard() {
+        let verificationGrid = assistanceMode == .notebook ? evidenceGrid : grilleUser
+        for index in verificationGrid.indices {
+            var hasCard = false
+            for typeElmt in 0..<nb_elements.count {
+                guard selectedElement.indices.contains(typeElmt),
+                      verificationGrid[index].cartes.indices.contains(typeElmt),
+                      verificationGrid[index].cartes[typeElmt].indices.contains(selectedElement[typeElmt])
+                else {
+                    continue
+                }
+                let selectedCard = verificationGrid[index].cartes[typeElmt][selectedElement[typeElmt]]
+                if selectedCard.valeur == "1" {
+                    hasCard = true
+                }
+            }
+            hasACard[index] = hasCard
+            if hasCard {
+                selectedRefutingPlayers.insert(grilleUser[index].nom)
+                //selectedRefutingPlayerIndices.append(index)
+            }
+        }
+    }
+    private func updateHasNoCard() {
+        let verificationGrid = assistanceMode == .notebook ? evidenceGrid : grilleUser
+        for index in verificationGrid.indices {
+            var noCard = true
+            for typeElmt in 0..<nb_elements.count {
+                guard selectedElement.indices.contains(typeElmt),
+                      verificationGrid[index].cartes.indices.contains(typeElmt),
+                      verificationGrid[index].cartes[typeElmt].indices.contains(selectedElement[typeElmt])
+                else {
+                    continue
+                }
+                let selectedCard = verificationGrid[index].cartes[typeElmt][selectedElement[typeElmt]]
+                if selectedCard.valeur != "0" {
+                    noCard = false
+                }
+            }
+            hasNoCard[index] = noCard
+            if noCard {
+                selectedRefutingPlayers.remove(grilleUser[index].nom)
+            }
+        }
+    }
+}
+
+private struct ShownCardChoice: Identifiable {
+    let id: Int
+    let name: String
+}
+
+struct AskTurnSheet_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            AskTurnSheet(isSheetPresented: .constant(true), joueurActifG: .constant(2))
+        }
+    }
+}

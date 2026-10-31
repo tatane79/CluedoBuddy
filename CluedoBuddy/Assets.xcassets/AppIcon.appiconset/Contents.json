@@ -1,0 +1,14 @@
+{
+  "images" : [
+    {
+      "filename" : "Clue_Buddy_icon_1024x1024.png",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
